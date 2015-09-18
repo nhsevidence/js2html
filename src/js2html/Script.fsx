@@ -2,7 +2,6 @@
 // for more guidance on F# programming.
 
 #load "Library.fs"
-open js2html
+open NICE.js2html
 
-let num = Library.hello 42
-printfn "%i" num
+Renderer.main
