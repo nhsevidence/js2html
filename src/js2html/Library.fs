@@ -57,7 +57,7 @@ module Renderer =
 
     /// writes a file
     let private toFile (fileName:string) (contents:string) =
-        use file = new FileStream(fileName, FileMode.Open, FileAccess.Write, FileShare.ReadWrite)
+        use file = new FileStream(fileName, FileMode.OpenOrCreate, FileAccess.Write, FileShare.ReadWrite)
         use writer = new StreamWriter(file)
         writer.Write contents
 
@@ -153,9 +153,9 @@ module Renderer =
         // either or
         let mutable ModelJson = (args.GetResult (<@ ModelJson @>, "" ))
         let mutable ModelFile = (args.GetResult (<@ ModelFile @>, "" ))
-        let html = 
+        let html =
             match ModelJson with
-            | "" -> 
+            | "" ->
                 match ModelFile with
                 | "" -> failwithf "--modeljson or --modelfile is required"
                 | _ -> generateFromFile TemplateName ModelFile
@@ -169,4 +169,3 @@ module Renderer =
             | _ -> html  |> outputAs OutputFile
 
         0 // return an integer exit code
-   
