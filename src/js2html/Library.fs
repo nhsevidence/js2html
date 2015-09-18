@@ -72,7 +72,7 @@ module Renderer =
         let templateFile = templateType.ToLower() + ".liquid"
         let templatePath =
             match templatesDir with
-            | None -> Path.Combine( __SOURCE_DIRECTORY__, templateFile )
+            | None -> Path.Combine( ".",templateFile )
             | Some root -> Path.Combine( root, templateFile )
         let t = Template.Parse( fromFile templatePath )
         fun v -> t.Render( v |> asModel )
@@ -150,22 +150,16 @@ module Renderer =
         // mandatory
         let TemplateName = (args.GetResult (<@ TemplateName @> ))
 
-        // either or
-        let mutable ModelJson = (args.GetResult (<@ ModelJson @>, "" ))
-        let mutable ModelFile = (args.GetResult (<@ ModelFile @>, "" ))
         let html =
-            match ModelJson with
-            | "" ->
-                match ModelFile with
-                | "" -> failwithf "--modeljson or --modelfile is required"
-                | _ -> generateFromFile TemplateName ModelFile
-            | _ -> generateFromJson TemplateName ModelJson
+          match (args.GetResult (<@ ModelJson @>, "" ))
+                (args.GetResult (<@ ModelFile @>, "" )) with
+            | "",""   -> failwithf "--modeljson or --modelfile is required"
+            | "",file -> generateFromFile TemplateName file
+            | json,_  -> generateFromJson TemplateName json
 
-        // optional
-        let mutable OutputFile = (args.GetResult (<@ OutputFile @>, "" ))
 
-        match OutputFile with
-            | "" -> printf "%s" html
-            | _ -> html  |> outputAs OutputFile
+        match (args.GetResult (<@ OutputFile @>, "" )) with
+            | "" -> print html
+            | output -> html  |> outputAs output
 
         0 // return an integer exit code
