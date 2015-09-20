@@ -7,7 +7,7 @@ open FSharp.Data
 open Nessos.Argu
 
 module Renderer =
-
+    let (++) a b = System.IO.Path.Combine(a,b)
     // -------------------------------------------------------------------------------------------------
     // Registering things with DotLiquid
     // -------------------------------------------------------------------------------------------------
@@ -34,15 +34,11 @@ module Renderer =
             |> Hash.FromDictionary
 
     and private asModelValue (value: JsonValue) =
-        let valueType = value.GetType().Name
-        match valueType with
-        | "String" ->   value.AsString() :> obj
-        | "Array" ->    (value.AsArray() |> Seq.map asModelValue ) :> obj
-        | "Record" ->   (value |> asModel) :> obj
-        | _ ->
-            let item = value.AsString()
-            printfn "\t--> %s" valueType
-            item :> obj
+        match value.GetType().Name with
+         | "String" ->   value.AsString() :> obj
+         | "Array" ->    value.AsArray() |> Seq.map asModelValue :> obj
+         | "Record" ->   value |> asModel :> obj
+         | _ -> value.AsString() :> obj
 
     /// Use the ruby naming convention by default
     do Template.NamingConvention <- DotLiquid.NamingConventions.RubyNamingConvention()
@@ -56,7 +52,7 @@ module Renderer =
         reader.ReadToEnd()
 
     /// writes a file
-    let private toFile (fileName:string) (contents:string) =
+    let private toFile fileName (contents:string) =
         use file = new FileStream(fileName, FileMode.OpenOrCreate, FileAccess.Write, FileShare.ReadWrite)
         use writer = new StreamWriter(file)
         writer.Write contents
@@ -66,7 +62,7 @@ module Renderer =
     // -------------------------------------------------------------------------------------------------
 
     let mutable private templatesDir = None
-
+    let parsedTemplates = System.Collections.Concurrent.ConcurrentDictionary<_,_>()
     /// loads a template
     let private renderAs (templateType: string) =
         let templateFile = templateType.ToLower() + ".liquid"
@@ -74,19 +70,16 @@ module Renderer =
             match templatesDir with
             | None -> Path.Combine( ".",templateFile )
             | Some root -> Path.Combine( root, templateFile )
-        let t = Template.Parse( fromFile templatePath )
+        let t = parsedTemplates.GetOrAdd (templatePath,Template.Parse( fromFile templatePath ))
         fun v -> t.Render( v |> asModel )
 
     /// loads a template
-    let private fromModelJson (modelJson: string) =
-        JsonValue.Parse( modelJson )
+    let private fromModelJson  = JsonValue.Parse
 
-    let private fromModelFile (modelPath: string) =
-        fromFile modelPath
+    let private fromModelFile = fromFile
 
     /// loads a template
-    let private outputAs (outputPath: string) (contents:string) =
-        toFile outputPath contents
+    let private outputAs  = toFile
 
     // -------------------------------------------------------------------------------------------------
     // Public API
@@ -118,14 +111,15 @@ module Renderer =
     ///
     ///     let app = Renderer.parse "drugModel.json"
     ///
-    let private generateFromFile (modelType:string) (inputFile:string) =
-        fromModelFile inputFile |> generateFromJson modelType
+    let private generateFromFile modelType inputFile =
+      (fromModelFile inputFile |> generateFromJson modelType,
+       Path.GetDirectoryName(inputFile) ++ Path.GetFileNameWithoutExtension(inputFile) + ".html" )
 
     type Arguments =
     | [<Mandatory>] TemplateName of string
     | ModelFile of string
     | ModelJson of string
-    | OutputFile of string
+    | OutputDir of string
     | TemplateDir of string
     with
         interface IArgParserTemplate with
@@ -134,7 +128,7 @@ module Renderer =
                 | TemplateName _ -> "The name of the view to use to render the passed json object"
                 | ModelFile _ -> "Location of a JSON file to load as the JSON object"
                 | ModelJson _ -> "a JSON string to use as the JSON object"
-                | OutputFile _ -> "Optional location to output the generated HTML"
+                | OutputDir _ -> "Optional location to output the generated HTML"
                 | TemplateDir _ -> "Change the loation of the view templates used from ./views/"
 
     let parser = ArgumentParser.Create<Arguments>()
@@ -149,17 +143,14 @@ module Renderer =
 
         // mandatory
         let TemplateName = (args.GetResult (<@ TemplateName @> ))
-
-        let html =
-          match (args.GetResult (<@ ModelJson @>, "" ))
-                (args.GetResult (<@ ModelFile @>, "" )) with
+        let output = args.GetResult (<@ OutputDir @>, "." )
+        match args.GetResult (<@ ModelJson @>,""),
+                args.GetResult (<@ ModelFile @>,"") with
             | "",""   -> failwithf "--modeljson or --modelfile is required"
-            | "",file -> generateFromFile TemplateName file
-            | json,_  -> generateFromJson TemplateName json
-
-
-        match (args.GetResult (<@ OutputFile @>, "" )) with
-            | "" -> print html
-            | output -> html  |> outputAs output
-
+            | "",file ->
+              for f in file.Split [|' '|] do
+                let (text,fn) = generateFromFile TemplateName f
+                toFile (output ++ fn) text
+            | json,_  ->
+                generateFromJson TemplateName json |> Console.Write
         0 // return an integer exit code
