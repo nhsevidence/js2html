@@ -5,12 +5,11 @@ open System.IO
 open DotLiquid
 open FSharp.Data
 open Nessos.Argu
-
+open FSharp.Control
+open FSharpx.Control
+open System.Text.RegularExpressions
 module Renderer =
     let (++) a b = System.IO.Path.Combine(a,b)
-    // -------------------------------------------------------------------------------------------------
-    // Registering things with DotLiquid
-    // -------------------------------------------------------------------------------------------------
 
     /// Represents a local file system relative to the specified 'root'
     let private localFileSystem root =
@@ -43,20 +42,17 @@ module Renderer =
     /// Use the ruby naming convention by default
     do Template.NamingConvention <- DotLiquid.NamingConventions.RubyNamingConvention()
 
-    // file helpers
 
     /// loads a file
-    let private fromFile (fileName:string) =
-        use file = new FileStream(fileName, FileMode.Open, FileAccess.Read, FileShare.ReadWrite)
-        use reader = new StreamReader( file )
-        reader.ReadToEnd()
-
+    let private fromFile (fileName:string) = async {
+            use! file = File.AsyncOpenText fileName
+            return file.ReadToEnd()
+        }
     /// writes a file
-    let private toFile fileName (contents:string) =
-        use file = new FileStream(fileName, FileMode.OpenOrCreate, FileAccess.Write, FileShare.ReadWrite)
-        use writer = new StreamWriter(file)
-        writer.Write contents
-
+    let private toFile fileName (contents:string) = async {
+        File.AsyncWriteAllText (fileName,contents) |> Async.Start
+        return ()
+       }
     // -------------------------------------------------------------------------------------------------
     // Parsing and loading DotLiquid templates
     // -------------------------------------------------------------------------------------------------
@@ -65,92 +61,83 @@ module Renderer =
     let parsedTemplates = System.Collections.Concurrent.ConcurrentDictionary<_,_>()
     /// loads a template
     let private renderAs (templateType: string) =
-        let templateFile = templateType.ToLower() + ".liquid"
+        let templateFile = templateType.ToLower()
         let templatePath =
             match templatesDir with
             | None -> Path.Combine( ".",templateFile )
             | Some root -> Path.Combine( root, templateFile )
-        let t = parsedTemplates.GetOrAdd (templatePath,Template.Parse( fromFile templatePath ))
+        let t = parsedTemplates.GetOrAdd (templatePath,Template.Parse( (fromFile templatePath |> Async.RunSynchronously  )))
         fun v -> t.Render( v |> asModel )
 
-    /// loads a template
-    let private fromModelJson  = JsonValue.Parse
 
-    let private fromModelFile = fromFile
-
-    /// loads a template
-    let private outputAs  = toFile
-
-    // -------------------------------------------------------------------------------------------------
-    // Public API
-    // -------------------------------------------------------------------------------------------------
-
-    /// Set the root directory where DotLiquid is looking for templates. For example, you can
-    /// write something like this:
-    ///
-    ///     DotLiquid.setTemplatesDir (__SOURCE_DIRECTORY__ + "/templates")
-    ///
-    /// note: The current directory is a global variable. This is a DotLiquid limitation.
     let setTemplatesDir dir =
         if templatesDir <> Some dir then
             templatesDir <- Some dir
             safe (fun () -> Template.FileSystem <- localFileSystem dir)
 
-    /// Render a page using DotLiquid template. Takes a path (relative to the directory specified
-    /// using `setTemplatesDir` and a value that is exposed as the "model" variable. You can use
-    /// any F# record type, seq<_> and list<_> without having to explicitly register the fields.
-    ///
-    ///     let app = Renderer.parse "drugModel.json"
-    ///
-    let private generateFromJson (modelType:string) (modelJson:string) =
-        fromModelJson modelJson |> renderAs modelType
+    let private generateFromJson modelType modelJson =
+        JsonValue.Parse modelJson |> renderAs modelType
 
-    /// Render a page using DotLiquid template. Takes a path (relative to the directory specified
-    /// using `setTemplatesDir` and a value that is exposed as the "model" variable. You can use
-    /// any F# record type, seq<_> and list<_> without having to explicitly register the fields.
-    ///
-    ///     let app = Renderer.parse "drugModel.json"
-    ///
-    let private generateFromFile modelType inputFile =
-      (fromModelFile inputFile |> generateFromJson modelType,
-       Path.GetDirectoryName(inputFile) ++ Path.GetFileNameWithoutExtension(inputFile) + ".html" )
+    let private generateFromFile modelType inputFile = async {
+      let! input = fromFile inputFile
+      return (generateFromJson modelType input,
+              Path.GetFileNameWithoutExtension(inputFile) + ".html" )
+      }
 
-    type Arguments =
-    | [<Mandatory>] TemplateName of string
-    | ModelFile of string
-    | ModelJson of string
-    | OutputDir of string
-    | TemplateDir of string
-    with
-        interface IArgParserTemplate with
-            member s.Usage =
-                match s with
-                | TemplateName _ -> "The name of the view to use to render the passed json object"
-                | ModelFile _ -> "Location of a JSON file to load as the JSON object"
-                | ModelJson _ -> "a JSON string to use as the JSON object"
-                | OutputDir _ -> "Optional location to output the generated HTML"
-                | TemplateDir _ -> "Change the loation of the view templates used from ./views/"
+    // if matched, return (command name, command value) as a tuple
+    let (|Command|_|) s =
+      let r = new Regex(@"^(?:-{1,2}|\/)(?<command>\w+)[=:]*(?<value>.*)$",RegexOptions.IgnoreCase)
+      let m = r.Match(s)
+      if m.Success
+        then
+          Some(m.Groups.["command"].Value.ToLower(), m.Groups.["value"].Value)
+        else
+          None
 
-    let parser = ArgumentParser.Create<Arguments>()
-
-    // get usage text
-    let usage = parser.Usage()
+    let parse args =
+      args
+      |> Seq.map (fun i ->
+                    match i with
+                    | Command (n,v) -> (n,v) // command
+                    | _ -> ("",i)            // data
+                  )
+      |> Seq.scan (fun (sn,_) (n,v) -> if n.Length>0 then (n,v) else (sn,v)) ("","")
+      |> Seq.skip 1
+      |> Seq.groupBy (fun (n,_) -> n)
+      |> Seq.map (fun (n,s) -> (n, s |> Seq.map (fun (_,v) -> v) |> Seq.filter (fun i -> i.Length>0)))
+      |> Map.ofSeq
 
     [<EntryPoint>]
     let main args =
-        let args = parser.Parse args
-        setTemplatesDir((args.GetResult (<@ TemplateDir @>, "./views/" )) )
+        let args = parse args
+        let scalar (arg,def) =
+          if args.ContainsKey arg then
+            args.[arg] |> Seq.head
+          else def
+        let list arg =
+          if args.ContainsKey arg then args.[arg] else Seq.empty
+        let templates = scalar ("templatedir","./views")
+        setTemplatesDir templates
 
-        // mandatory
-        let TemplateName = (args.GetResult (<@ TemplateName @> ))
-        let output = args.GetResult (<@ OutputDir @>, "." )
-        match args.GetResult (<@ ModelJson @>,""),
-                args.GetResult (<@ ModelFile @>,"") with
-            | "",""   -> failwithf "--modeljson or --modelfile is required"
-            | "",file ->
-              for f in file.Split [|' '|] do
-                let (text,fn) = generateFromFile TemplateName f
-                toFile (output ++ fn) text
+        let template = scalar ("template","")
+        let output = scalar ("output",".")
+        let apply f = async{
+                  let! (text,fn) = generateFromFile template f
+                  toFile (output ++ fn) text |> Async.Start
+                  return fn
+                  }
+
+        printfn "Loading templates from %s, using root %s" templates template
+
+        printfn "%A" (args)
+        match scalar ("json",""),
+              list "file" with
+            | "",xs when Seq.isEmpty xs   -> failwithf "--json or --file is required"
+            | "",xs ->
+              AsyncSeq.ofSeq xs
+              |> AsyncSeq.map apply
+              |> AsyncSeq.iter (fun s -> (printfn "%s" (Async.RunSynchronously s)))
+              |> Async.RunSynchronously
             | json,_  ->
-                generateFromJson TemplateName json |> Console.Write
+                generateFromJson template json |> Console.Write
         0 // return an integer exit code

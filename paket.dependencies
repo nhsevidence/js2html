@@ -4,6 +4,7 @@ nuget Argu
 nuget Dotliquid
 nuget FSharp.Data
 nuget FSharp.Formatting
+nuget FSharpX.Async
 nuget NUnit 
 nuget NUnit.Runners
 nuget FAKE

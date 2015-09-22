@@ -2,3 +2,4 @@ NUnit
 NUnit.Runners
 FSharp.Data
 Dotliquid
+FSharpX.Async
