@@ -25,10 +25,14 @@ module Renderer =
       let o = obj()
       fun f -> lock o f
 
+    let propertyName (s:string) =
+      s.Replace("@","")
+       .Replace(":","")
+
     // JsonValue to Hash
     let rec private asModel (target: JsonValue) =
         target.Properties()
-            |> Seq.map(fun (key, value) -> (key, value |> asModelValue :> obj ) )
+            |> Seq.map(fun (key, value) -> (propertyName key, value |> asModelValue :> obj ) )
             |> dict
             |> Hash.FromDictionary
 
@@ -41,7 +45,6 @@ module Renderer =
 
     /// Use the ruby naming convention by default
     do Template.NamingConvention <- DotLiquid.NamingConventions.RubyNamingConvention()
-
 
     /// loads a file
     let private fromFile (fileName:string) = async {
@@ -67,7 +70,9 @@ module Renderer =
             | None -> Path.Combine( ".",templateFile )
             | Some root -> Path.Combine( root, templateFile )
         let t = parsedTemplates.GetOrAdd (templatePath,Template.Parse( (fromFile templatePath |> Async.RunSynchronously  )))
-        fun v -> t.Render( v |> asModel )
+        fun v ->
+          printfn "%A" (asModel v)
+          t.Render( v |> asModel )
 
 
     let setTemplatesDir dir =
@@ -123,13 +128,13 @@ module Renderer =
         let output = scalar ("output",".")
         let apply f = async{
                   let! (text,fn) = generateFromFile template f
-                  toFile (output ++ fn) text |> Async.Start
+                  let fn = (output ++ fn)
+                  toFile fn text |> Async.Start
                   return fn
                   }
 
         printfn "Loading templates from %s, using root %s" templates template
 
-        printfn "%A" (args)
         match scalar ("json",""),
               list "file" with
             | "",xs when Seq.isEmpty xs   -> failwithf "--json or --file is required"

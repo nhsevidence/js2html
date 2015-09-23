@@ -1,1 +1,11 @@
-{"@id":"http://ld.nice.org.uk/prov/entity#98ead3d:qualitystandards/qs70/st2/Statement.md","@type":["prov:Entity","owl:NamedIndividual"],"qualitystandard:setting":"http://ld.nice.org.uk/ns/qualitystandard/setting#Primary care setting","qualitystandard:targetPopulation":["http://ld.nice.org.uk/ns/qualitystandard/agegroup#Children 1-15 years","http://ld.nice.org.uk/ns/qualitystandard/agegroup#Young people","http://ld.nice.org.uk/ns/qualitystandard/conditiondisease#Urinary incontinence"],"dcterms:abstract":"Children and young people have an agreed review date if they, or their\nparents or carers, are given advice about changing their daily routine\nto help with bedwetting.","http://purl.org/dc/terms/title":"Quality statement 2: Review after initial advice is given","prov:specializationOf":"resource:FF2ED3E529E5BDCDED86C24D3277F8A156814492DFE352A09804DF3228109D63","_id":"resource:FF2ED3E529E5BDCDED86C24D3277F8A156814492DFE352A09804DF3228109D63","_type":"qualitystatement"}
+{
+    "@id": "http://ld.nice.org.uk/prov/entity#98ead3d:qualitystandards/qs70/st2/Statement.md",
+    "@type": ["prov:Entity", "owl:NamedIndividual"],
+    "qualitystandard:setting": "http://ld.nice.org.uk/ns/qualitystandard/setting#Primary care setting",
+    "qualitystandard:targetPopulation": ["http://ld.nice.org.uk/ns/qualitystandard/agegroup#Children 1-15 years", "http://ld.nice.org.uk/ns/qualitystandard/agegroup#Young people", "http://ld.nice.org.uk/ns/qualitystandard/conditiondisease#Urinary incontinence"],
+    "dcterms:abstract": "Children and young people have an agreed review date if they, or their\nparents or carers, are given advice about changing their daily routine\nto help with bedwetting.",
+    "dcterms:title": "Quality statement 2: Review after initial advice is given",
+    "prov:specializationOf": "resource:FF2ED3E529E5BDCDED86C24D3277F8A156814492DFE352A09804DF3228109D63",
+    "_id": "resource:FF2ED3E529E5BDCDED86C24D3277F8A156814492DFE352A09804DF3228109D63",
+    "_type": "qualitystatement"
+}
