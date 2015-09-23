@@ -1,23 +1,20 @@
-type project
+type file
+id NICE.Js2Html
 owners
-    Author not set
+    NICE
 authors 
-    Author not set
+    Ryan Roberts
 projectUrl
-    http://github.com/[github-user]/js2html
+    http://github.com/nhsevidence/js2html
 iconUrl
-    https://raw.githubusercontent.com/[github-user]/js2html/master/docs/files/img/logo.png
+    https://raw.githubusercontent.com/nhsevidence/js2html/master/docs/files/img/logo.png
 licenseUrl
-    http://github.com/[github-user]/js2html/blob/master/LICENSE.txt
+    http://github.com/nhsevdience/js2html/blob/master/LICENSE.txt
 requireLicenseAcceptance
     false
 copyright
     Copyright 2015
-tags
-    
 summary
     Dotliquid templating for json objects
-description
-    Description not set
-
-
+files
+  ../../bin ==> tools

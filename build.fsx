@@ -173,9 +173,10 @@ Target "NuGet" (fun _ ->
 )
 
 Target "PublishNuget" (fun _ ->
-    Paket.Push(fun p -> 
-        { p with
-            WorkingDir = "bin" })
+    Paket.Push(fun p ->
+               { p with
+                   ApiKey = "f3709835-b06d-444a-87dc-18786597f812"
+                   WorkingDir = "bin" })
 )
 
 
