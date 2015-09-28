@@ -16,5 +16,7 @@ copyright
     Copyright 2015
 summary
     Dotliquid templating for json objects
+description
+    Dotliquid templating for json objects
 files
   ../../bin ==> tools
