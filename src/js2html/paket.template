@@ -19,4 +19,4 @@ summary
 description
     Dotliquid templating for json objects
 files
-  ../../bin ==> tools
+  ../../bin/js2html ==> tools
