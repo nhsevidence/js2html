@@ -177,6 +177,7 @@ Target "PublishNuget" (fun _ ->
                { p with
                    ApiKey = "f3709835-b06d-444a-87dc-18786597f812"
                    WorkingDir = "bin" })
+    System.Console.WriteLine "Pushed?"
 )
 
 

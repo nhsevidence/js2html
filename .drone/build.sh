@@ -4,3 +4,4 @@ cd $DRONE_BUILD_DIR
 
 
 ./build.sh BuildPackage
+./build.sh PublishNuget 
